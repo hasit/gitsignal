@@ -1,0 +1,69 @@
+<svg width="1200" height="750" viewBox="0 0 1200 750" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="GitSignal screenshot mock">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="750" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0B1220"/>
+      <stop offset="1" stop-color="#111827"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#F8FAFC"/>
+    </linearGradient>
+    <filter id="shadow" x="-20" y="-20" width="1240" height="790" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#000000" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="750" rx="28" fill="url(#bg)"/>
+
+  <g filter="url(#shadow)">
+    <rect x="90" y="70" width="1020" height="610" rx="18" fill="url(#card)"/>
+    <rect x="90" y="70" width="1020" height="54" rx="18" fill="#F1F5F9"/>
+    <circle cx="124" cy="97" r="7" fill="#FF5F57"/>
+    <circle cx="148" cy="97" r="7" fill="#FEBB2E"/>
+    <circle cx="172" cy="97" r="7" fill="#28C840"/>
+    <text x="600" y="104" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica Neue,Arial" font-size="15" fill="#334155">GitSignal</text>
+
+    <!-- Header -->
+    <text x="130" y="175" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica Neue,Arial" font-size="22" font-weight="700" fill="#0F172A">Notifications</text>
+    <rect x="900" y="152" width="180" height="34" rx="8" fill="#0969DA"/>
+    <text x="990" y="174" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica Neue,Arial" font-size="13" font-weight="700" fill="#FFFFFF">Mark all read</text>
+
+    <!-- List -->
+    <g>
+      <rect x="130" y="210" width="940" height="70" rx="12" fill="#FFFFFF" stroke="#E2E8F0"/>
+      <rect x="150" y="235" width="18" height="18" rx="6" fill="#E11D48"/>
+      <text x="180" y="238" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica Neue,Arial" font-size="12" fill="#64748B">hasit/gitsignal</text>
+      <text x="180" y="262" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica Neue,Arial" font-size="15" font-weight="700" fill="#0F172A">PR review requested: Improve token guidance</text>
+      <text x="950" y="250" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica Neue,Arial" font-size="12" fill="#64748B">PullRequest</text>
+    </g>
+
+    <g>
+      <rect x="130" y="295" width="940" height="70" rx="12" fill="#FFFFFF" stroke="#E2E8F0"/>
+      <rect x="150" y="320" width="18" height="18" rx="6" fill="#F59E0B"/>
+      <text x="180" y="323" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica Neue,Arial" font-size="12" fill="#64748B">openai/codex</text>
+      <text x="180" y="347" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica Neue,Arial" font-size="15" font-weight="700" fill="#0F172A">Mentioned you in an issue: CI failing on Linux</text>
+      <text x="950" y="335" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica Neue,Arial" font-size="12" fill="#64748B">Issue</text>
+    </g>
+
+    <g>
+      <rect x="130" y="380" width="940" height="70" rx="12" fill="#FFFFFF" stroke="#E2E8F0"/>
+      <rect x="150" y="405" width="18" height="18" rx="6" fill="#10B981"/>
+      <text x="180" y="408" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica Neue,Arial" font-size="12" fill="#64748B">electron/electron</text>
+      <text x="180" y="432" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica Neue,Arial" font-size="15" font-weight="700" fill="#0F172A">New release: Electron v26.6.10</text>
+      <text x="950" y="420" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica Neue,Arial" font-size="12" fill="#64748B">Release</text>
+    </g>
+
+    <g>
+      <rect x="130" y="465" width="940" height="70" rx="12" fill="#FFFFFF" stroke="#E2E8F0"/>
+      <rect x="150" y="490" width="18" height="18" rx="6" fill="#6366F1"/>
+      <text x="180" y="493" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica Neue,Arial" font-size="12" fill="#64748B">hasit/gitsignal</text>
+      <text x="180" y="517" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica Neue,Arial" font-size="15" font-weight="700" fill="#0F172A">Discussion: Website content ideas</text>
+      <text x="950" y="505" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica Neue,Arial" font-size="12" fill="#64748B">Discussion</text>
+    </g>
+
+    <!-- Footer hint -->
+    <text x="600" y="640" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica Neue,Arial" font-size="12" fill="#64748B">
+      Screenshot mock (replace with a real screenshot any time)
+    </text>
+  </g>
+</svg>

@@ -412,57 +412,73 @@ function TokenInputForm({ onSubmit, isLoading, error }) {
 function WebLanding() {
   const repoUrl = import.meta.env.VITE_REPO_URL || 'https://github.com/hasit/gitsignal'
   const releasesUrl = `${repoUrl.replace(/\/$/, '')}/releases/latest`
+  const baseUrl = import.meta.env.BASE_URL || '/'
+  const features = [
+    { title: 'Menubar app', description: 'Always-on access to your GitHub notifications.' },
+    { title: 'Native notifications', description: 'macOS notifications with direct links back to GitHub.' },
+    { title: 'Fast polling', description: 'ETag caching for efficient refreshes.' },
+    { title: 'Mark as read', description: 'Mark individual or all notifications as read.' },
+    { title: 'Secure storage', description: 'Stores your token in macOS Keychain (via keytar).' },
+    { title: 'No OAuth setup', description: 'Paste a token and you’re good to go.' }
+  ]
 
   return (
-    <div style={{ padding: 24, maxWidth: 900, margin: '0 auto' }}>
-      <h1 style={{ marginBottom: 8 }}>GitSignal</h1>
-      <p style={{ color: '#444', marginBottom: 18 }}>
-        GitHub notifications in your macOS menubar.
-      </p>
+    <div className="web-landing">
+      <div className="web-hero">
+        <div>
+          <h1 className="web-title">GitSignal</h1>
+          <p className="web-subtitle">
+            GitHub notifications in your macOS menubar.
+          </p>
 
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 18 }}>
-        <a
-          href={releasesUrl}
-          target="_blank"
-          rel="noreferrer"
-          style={{
-            display: 'inline-block',
-            padding: '10px 14px',
-            borderRadius: 8,
-            background: '#0969da',
-            color: 'white',
-            textDecoration: 'none',
-            fontWeight: 600
-          }}
-        >
-          Download latest (macOS)
-        </a>
-        <a
-          href={repoUrl}
-          target="_blank"
-          rel="noreferrer"
-          style={{
-            display: 'inline-block',
-            padding: '10px 14px',
-            borderRadius: 8,
-            border: '1px solid #ddd',
-            background: '#f7f7f7',
-            color: '#111',
-            textDecoration: 'none',
-            fontWeight: 600
-          }}
-        >
-          View on GitHub
-        </a>
+          <div className="web-cta">
+            <a
+              href={releasesUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="web-button web-buttonPrimary"
+            >
+              Download latest (macOS)
+            </a>
+            <a
+              href={repoUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="web-button"
+            >
+              View on GitHub
+            </a>
+          </div>
+
+          <div className="web-install">
+            <h2 className="web-sectionTitle">Install</h2>
+            <ol className="web-list">
+              <li>Download the latest <code>.dmg</code> from GitHub Releases</li>
+              <li>Open it and drag GitSignal into <code>Applications</code></li>
+              <li>Launch GitSignal and paste your GitHub token</li>
+            </ol>
+          </div>
+        </div>
+
+        <div className="web-screenshotWrap">
+          <img
+            src={`${baseUrl}screenshot.svg`}
+            alt="GitSignal app screenshot"
+            className="web-screenshot"
+          />
+        </div>
       </div>
 
-      <div style={{ padding: 16, background: '#f5f5f5', borderRadius: 8 }}>
-        <h2 style={{ marginTop: 0, fontSize: 16, marginBottom: 8 }}>Install</h2>
-        <ol style={{ margin: 0, paddingLeft: 18, color: '#333', lineHeight: 1.5 }}>
-          <li>Download the latest <code>.dmg</code> from GitHub Releases</li>
-          <li>Open it and drag GitSignal into <code>Applications</code></li>
-          <li>Launch GitSignal and paste your GitHub token</li>
-        </ol>
+      <div className="web-features">
+        <h2 className="web-sectionTitle">Features</h2>
+        <div className="web-featureGrid">
+          {features.map((feature) => (
+            <div key={feature.title} className="web-featureCard">
+              <div className="web-featureTitle">{feature.title}</div>
+              <div className="web-featureDescription">{feature.description}</div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   )
