@@ -409,11 +409,71 @@ function TokenInputForm({ onSubmit, isLoading, error }) {
   )
 }
 
+function WebLanding() {
+  const repoUrl = import.meta.env.VITE_REPO_URL || 'https://github.com/hasit/gitsignal'
+  const releasesUrl = `${repoUrl.replace(/\/$/, '')}/releases/latest`
+
+  return (
+    <div style={{ padding: 24, maxWidth: 900, margin: '0 auto' }}>
+      <h1 style={{ marginBottom: 8 }}>GitSignal</h1>
+      <p style={{ color: '#444', marginBottom: 18 }}>
+        GitHub notifications in your macOS menubar.
+      </p>
+
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 18 }}>
+        <a
+          href={releasesUrl}
+          target="_blank"
+          rel="noreferrer"
+          style={{
+            display: 'inline-block',
+            padding: '10px 14px',
+            borderRadius: 8,
+            background: '#0969da',
+            color: 'white',
+            textDecoration: 'none',
+            fontWeight: 600
+          }}
+        >
+          Download latest (macOS)
+        </a>
+        <a
+          href={repoUrl}
+          target="_blank"
+          rel="noreferrer"
+          style={{
+            display: 'inline-block',
+            padding: '10px 14px',
+            borderRadius: 8,
+            border: '1px solid #ddd',
+            background: '#f7f7f7',
+            color: '#111',
+            textDecoration: 'none',
+            fontWeight: 600
+          }}
+        >
+          View on GitHub
+        </a>
+      </div>
+
+      <div style={{ padding: 16, background: '#f5f5f5', borderRadius: 8 }}>
+        <h2 style={{ marginTop: 0, fontSize: 16, marginBottom: 8 }}>Install</h2>
+        <ol style={{ margin: 0, paddingLeft: 18, color: '#333', lineHeight: 1.5 }}>
+          <li>Download the latest <code>.dmg</code> from GitHub Releases</li>
+          <li>Open it and drag GitSignal into <code>Applications</code></li>
+          <li>Launch GitSignal and paste your GitHub token</li>
+        </ol>
+      </div>
+    </div>
+  )
+}
+
 export default function App() {
   console.log('App component rendering...')
   const [notifications, setNotifications] = useState([])
   const [status, setStatus] = useState('checking-auth')
   const [error, setError] = useState(null)
+  const [runtime] = useState(() => (window.electron?.auth ? 'electron' : 'web'))
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isAuthenticating, setIsAuthenticating] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
@@ -429,9 +489,8 @@ export default function App() {
   // Check for existing token on mount
   useEffect(() => {
     async function checkAuth() {
-      if (!window.electron?.auth) {
-        setError('Electron API not available')
-        setStatus('error')
+      if (runtime !== 'electron') {
+        setStatus('web')
         return
       }
 
@@ -451,7 +510,7 @@ export default function App() {
     }
 
     checkAuth()
-  }, [])
+  }, [runtime])
 
   // Start polling when authenticated
   useEffect(() => {
@@ -557,6 +616,10 @@ export default function App() {
     }
   }
 
+  if (runtime === 'web') {
+    return <WebLanding />
+  }
+
   if (error) {
     return (
       <div style={{ padding: 20 }}>
@@ -564,11 +627,9 @@ export default function App() {
         <div style={{ color: 'red', padding: 10, background: '#fee', borderRadius: 4, marginBottom: 10 }}>
           Error: {error}
         </div>
-        {!isAuthenticated && (
-          <button onClick={handleLogin} disabled={isAuthenticating}>
-            {isAuthenticating ? 'Authenticating...' : 'Try Login Again'}
-          </button>
-        )}
+        <button onClick={() => window.location.reload()} disabled={isAuthenticating}>
+          {isAuthenticating ? 'Reloading...' : 'Reload'}
+        </button>
       </div>
     )
   }

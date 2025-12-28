@@ -7,15 +7,19 @@
     "dev": "vite",
     "start": "NODE_ENV=development electron .",
     "dev:electron": "concurrently \"vite\" \"wait-on http://localhost:5173 && NODE_ENV=development electron .\"",
+    "build:web": "vite build",
+    "build:electron": "npm run build:web && electron-builder --mac",
     "build": "vite build && electron-builder",
     "package": "electron-builder --mac"
   },
   "dependencies": {
     "axios": "^1.4.0",
     "electron-store": "^8.1.0",
-    "keytar": "^7.9.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
+  },
+  "optionalDependencies": {
+    "keytar": "^7.9.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.0.0",

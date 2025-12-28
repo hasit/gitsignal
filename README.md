@@ -68,8 +68,31 @@ This app uses **Personal Access Tokens** instead of OAuth, which is better for d
 ## Building for Production
 
 ```bash
-npm run build
-npm run package
+# Build the renderer (web assets)
+npm run build:web
+
+# Build the macOS app (.dmg)
+npm run build:electron
 ```
 
 This creates a `.dmg` file in the `dist/` folder that you can distribute.
+
+## CI/CD (GitHub Actions)
+
+This repo includes:
+
+- `ci.yml`: runs a build on PRs and pushes to `main`
+- `pages.yml`: deploys the website to GitHub Pages (custom domain: `gitsignal.dev`) on pushes to `main`
+- `release.yml`: builds a macOS `.dmg` and publishes a GitHub Release when you push a `v*` tag
+
+### GitHub Pages setup
+
+1. In GitHub repo settings → **Pages**, set **Source** to **GitHub Actions**
+2. Set the custom domain to `gitsignal.dev` (the workflow publishes `public/CNAME`)
+
+### Creating a release
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
