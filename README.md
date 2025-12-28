@@ -85,11 +85,6 @@ This repo includes:
 - `pages.yml`: deploys the website to GitHub Pages (custom domain: `gitsignal.dev`) on pushes to `main`
 - `release.yml`: builds a macOS `.dmg` and publishes a GitHub Release when you push a `v*` tag
 
-### GitHub Pages setup
-
-1. In GitHub repo settings → **Pages**, set **Source** to **GitHub Actions**
-2. Set the custom domain to `gitsignal.dev` (the workflow publishes `public/CNAME`)
-
 ### Creating a release
 
 ```bash
