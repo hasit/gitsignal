@@ -4,7 +4,7 @@
     "name": "Hasit Mistry",
     "email": "hasitnm@gmail.com"
   },
-  "description": "Manage GitHub notifications on your desktop.",
+  "description": "View and manage GitHub notifications on your desktop.",
   "version": "0.1.0",
   "private": true,
   "main": "electron/main.js",
