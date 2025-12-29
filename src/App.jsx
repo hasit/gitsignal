@@ -8,31 +8,6 @@ const DEFAULT_FILTERS = {
   reasons: ['review_requested']
 }
 
-const FILTER_OPTIONS = {
-  types: [
-    'PullRequest',
-    'Issue',
-    'Discussion',
-    'Commit',
-    'Release',
-    'RepositoryVulnerabilityAlert'
-  ],
-  reasons: [
-    'review_requested',
-    'mention',
-    'team_mention',
-    'assign',
-    'author',
-    'comment',
-    'invitation',
-    'manual',
-    'security_advisory_credit',
-    'security_alert',
-    'state_change',
-    'subscribed'
-  ]
-}
-
 function normalizeFilters(filters) {
   const types = Array.isArray(filters?.types) ? filters.types.filter(Boolean) : []
   const reasons = Array.isArray(filters?.reasons) ? filters.reasons.filter(Boolean) : []
@@ -49,6 +24,29 @@ function loadFiltersFromStorage() {
   }
 }
 
+function getFilterOptions(notifications, filters) {
+  const typeSet = new Set()
+  const reasonSet = new Set()
+
+  for (const notification of notifications || []) {
+    if (notification?.subject?.type) typeSet.add(notification.subject.type)
+    if (notification?.reason) reasonSet.add(notification.reason)
+  }
+
+  for (const type of filters?.types || []) {
+    if (type) typeSet.add(type)
+  }
+
+  for (const reason of filters?.reasons || []) {
+    if (reason) reasonSet.add(reason)
+  }
+
+  return {
+    types: Array.from(typeSet).sort(),
+    reasons: Array.from(reasonSet).sort()
+  }
+}
+
 function matchesFilters(notification, filters) {
   const typeMatch = filters.types.length === 0 || filters.types.includes(notification.subject.type)
   const reasonMatch = filters.reasons.length === 0 || filters.reasons.includes(notification.reason)
@@ -56,7 +54,7 @@ function matchesFilters(notification, filters) {
 }
 
 // Settings/Preferences component
-function Settings({ onClose, onLogout, markAsReadOnClick, onMarkAsReadOnClickChange, filters, onFiltersChange }) {
+function Settings({ onClose, onLogout, markAsReadOnClick, onMarkAsReadOnClickChange, filters, onFiltersChange, notifications }) {
   const [tokenInfo, setTokenInfo] = useState(null)
   const [loading, setLoading] = useState(true)
   const [newToken, setNewToken] = useState('')
@@ -66,6 +64,8 @@ function Settings({ onClose, onLogout, markAsReadOnClick, onMarkAsReadOnClickCha
   const [appSettingsLoading, setAppSettingsLoading] = useState(true)
   const [appSettingsSaving, setAppSettingsSaving] = useState(false)
   const [appSettingsError, setAppSettingsError] = useState(null)
+
+  const filterOptions = getFilterOptions(notifications, filters)
 
   useEffect(() => {
     // Fetch current token info from GitHub
@@ -283,46 +283,58 @@ function Settings({ onClose, onLogout, markAsReadOnClick, onMarkAsReadOnClickCha
         <div style={{ display: 'grid', gap: 14, marginTop: 12 }}>
           <div>
             <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>Types</div>
-            <div style={{ display: 'grid', gap: 8 }}>
-              {FILTER_OPTIONS.types.map((type) => (
-                <label key={type} style={{ display: 'flex', gap: 10, alignItems: 'center', cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={filters.types.includes(type)}
-                    onChange={(e) => {
-                      const nextTypes = e.target.checked
-                        ? [...filters.types, type]
-                        : filters.types.filter(t => t !== type)
-                      onFiltersChange({ ...filters, types: nextTypes })
-                    }}
-                    style={{ width: 16, height: 16, cursor: 'pointer' }}
-                  />
-                  <span style={{ fontSize: 13 }}>{type}</span>
-                </label>
-              ))}
-            </div>
+            {filterOptions.types.length === 0 ? (
+              <p style={{ color: '#666', fontSize: 12, margin: 0 }}>
+                No notification types available yet.
+              </p>
+            ) : (
+              <div style={{ display: 'grid', gap: 8 }}>
+                {filterOptions.types.map((type) => (
+                  <label key={type} style={{ display: 'flex', gap: 10, alignItems: 'center', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={filters.types.includes(type)}
+                      onChange={(e) => {
+                        const nextTypes = e.target.checked
+                          ? [...filters.types, type]
+                          : filters.types.filter(t => t !== type)
+                        onFiltersChange({ ...filters, types: nextTypes })
+                      }}
+                      style={{ width: 16, height: 16, cursor: 'pointer' }}
+                    />
+                    <span style={{ fontSize: 13 }}>{type}</span>
+                  </label>
+                ))}
+              </div>
+            )}
           </div>
 
           <div>
             <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>Reasons</div>
-            <div style={{ display: 'grid', gap: 8 }}>
-              {FILTER_OPTIONS.reasons.map((reason) => (
-                <label key={reason} style={{ display: 'flex', gap: 10, alignItems: 'center', cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={filters.reasons.includes(reason)}
-                    onChange={(e) => {
-                      const nextReasons = e.target.checked
-                        ? [...filters.reasons, reason]
-                        : filters.reasons.filter(r => r !== reason)
-                      onFiltersChange({ ...filters, reasons: nextReasons })
-                    }}
-                    style={{ width: 16, height: 16, cursor: 'pointer' }}
-                  />
-                  <span style={{ fontSize: 13 }}>{reason.replace(/_/g, ' ')}</span>
-                </label>
-              ))}
-            </div>
+            {filterOptions.reasons.length === 0 ? (
+              <p style={{ color: '#666', fontSize: 12, margin: 0 }}>
+                No notification reasons available yet.
+              </p>
+            ) : (
+              <div style={{ display: 'grid', gap: 8 }}>
+                {filterOptions.reasons.map((reason) => (
+                  <label key={reason} style={{ display: 'flex', gap: 10, alignItems: 'center', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={filters.reasons.includes(reason)}
+                      onChange={(e) => {
+                        const nextReasons = e.target.checked
+                          ? [...filters.reasons, reason]
+                          : filters.reasons.filter(r => r !== reason)
+                        onFiltersChange({ ...filters, reasons: nextReasons })
+                      }}
+                      style={{ width: 16, height: 16, cursor: 'pointer' }}
+                    />
+                    <span style={{ fontSize: 13 }}>{reason.replace(/_/g, ' ')}</span>
+                  </label>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -423,9 +435,7 @@ function Settings({ onClose, onLogout, markAsReadOnClick, onMarkAsReadOnClickCha
 function FilterBar({ notifications, filters, onFilterChange }) {
   const [isExpanded, setIsExpanded] = useState(false)
 
-  // Get unique types and reasons from notifications
-  const availableTypes = [...new Set(notifications.map(n => n.subject.type))].sort()
-  const availableReasons = [...new Set(notifications.map(n => n.reason))].sort()
+  const { types: availableTypes, reasons: availableReasons } = getFilterOptions(notifications, filters)
 
   const toggleFilter = (category, value) => {
     const current = filters[category]
@@ -914,6 +924,7 @@ export default function App() {
         onMarkAsReadOnClickChange={handleMarkAsReadOnClickChange}
         filters={filters}
         onFiltersChange={setFilters}
+        notifications={notifications}
       />
     )
   }
