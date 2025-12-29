@@ -21,6 +21,14 @@ const __dirname = path.dirname(__filename);
 const APP_NAME = "GitSignal";
 const WEBSITE_URL = "https://gitsignal.dev";
 
+const OPEN_DEVTOOLS =
+  process.env.ELECTRON_OPEN_DEVTOOLS === "1" ||
+  process.env.ELECTRON_OPEN_DEVTOOLS === "true";
+
+if (process.env.ELECTRON_DISABLE_HARDWARE_ACCELERATION === "1") {
+  app.disableHardwareAcceleration();
+}
+
 // Use a nicer internal name for menus in development. (Packaging name is handled by the OS.)
 if (process.platform === "darwin" || process.platform === "win32") {
   app.setName(APP_NAME);
@@ -170,7 +178,7 @@ function createWindow() {
 
   if (isDev) {
     mainWindow.loadURL("http://localhost:5173");
-    mainWindow.webContents.openDevTools();
+    if (OPEN_DEVTOOLS) mainWindow.webContents.openDevTools({ mode: "detach" });
   } else {
     mainWindow.loadFile(path.join(__dirname, "..", "dist", "index.html"));
   }
