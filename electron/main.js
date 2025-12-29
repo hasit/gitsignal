@@ -1,4 +1,4 @@
-const {
+import {
   app,
   BrowserWindow,
   Tray,
@@ -7,10 +7,16 @@ const {
   Notification,
   ipcMain,
   shell,
-} = require("electron");
-const path = require("path");
-const fs = require("fs");
-const Store = require("electron-store");
+} from "electron";
+import fs from "node:fs";
+import path from "node:path";
+import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
+import Store from "electron-store";
+
+const require = createRequire(import.meta.url);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const APP_NAME = "GitSignal";
 const WEBSITE_URL = "https://gitsignal.dev";
@@ -102,10 +108,12 @@ function applyAppSettings() {
   settingsStore.set(settings);
 
   // Launch at login (macOS / Windows supported by Electron).
-  try {
-    app.setLoginItemSettings({ openAtLogin: settings.launchAtLogin });
-  } catch (err) {
-    console.error("Failed to update launchAtLogin:", err?.message);
+  if (app.isPackaged) {
+    try {
+      app.setLoginItemSettings({ openAtLogin: settings.launchAtLogin });
+    } catch (err) {
+      console.error("Failed to update launchAtLogin:", err?.message);
+    }
   }
 
   // Dock icon (macOS only).
@@ -154,7 +162,7 @@ function createWindow() {
     icon: iconPath || undefined,
     show: false,
     webPreferences: {
-      preload: path.join(__dirname, "preload.js"),
+      preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
     },
@@ -234,16 +242,23 @@ function configureAboutPanel() {
   const iconPath = getAppIconPath();
   const author = getAuthorName();
   const hasAuthor = Boolean(author) && author !== "Unknown";
+  const credits =
+    [WEBSITE_URL, hasAuthor ? `Author: ${author}` : null]
+      .filter(Boolean)
+      .join("\n") || undefined;
 
   try {
     app.setAboutPanelOptions({
       applicationName: APP_NAME,
-      website: WEBSITE_URL,
-      iconPath: iconPath || undefined,
       applicationVersion: app.getVersion(),
       copyright: hasAuthor
         ? `© ${new Date().getFullYear()} ${author}`
         : undefined,
+      credits,
+      ...(process.platform !== "darwin" ? { iconPath: iconPath || undefined } : {}),
+      ...(process.platform === "linux"
+        ? { website: WEBSITE_URL, authors: hasAuthor ? [author] : undefined }
+        : {}),
     });
   } catch (err) {
     console.error("Failed to set About panel options:", err?.message);
