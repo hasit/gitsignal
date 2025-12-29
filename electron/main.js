@@ -10,6 +10,118 @@ const {
 } = require("electron");
 const path = require("path");
 const fs = require("fs");
+const Store = require("electron-store");
+
+const APP_NAME = "GitSignal";
+const WEBSITE_URL = "https://gitsignal.dev";
+
+// Use a nicer internal name for menus in development. (Packaging name is handled by the OS.)
+if (process.platform === "darwin" || process.platform === "win32") {
+  app.setName(APP_NAME);
+}
+
+const settingsStore = new Store({
+  name: "gitsignal",
+  defaults: {
+    launchAtLogin: false,
+    showMenubarIcon: true,
+    showDockIcon: true,
+    closeToTray: true,
+  },
+});
+
+function findFirstExistingPath(paths) {
+  for (const p of paths) {
+    if (p && fs.existsSync(p)) return p;
+  }
+  return null;
+}
+
+function getAppIconPath() {
+  return findFirstExistingPath([
+    path.join(__dirname, "..", "dist", "icon.png"),
+    path.join(__dirname, "..", "public", "icon.png"),
+  ]);
+}
+
+function getTrayIconPaths() {
+  return {
+    base: findFirstExistingPath([
+      path.join(__dirname, "..", "dist", "trayTemplate.png"),
+      path.join(__dirname, "..", "public", "trayTemplate.png"),
+    ]),
+    retina: findFirstExistingPath([
+      path.join(__dirname, "..", "dist", "trayTemplate@2x.png"),
+      path.join(__dirname, "..", "public", "trayTemplate@2x.png"),
+    ]),
+  };
+}
+
+function getPackageMetadata() {
+  try {
+    const pkgPath = path.join(app.getAppPath(), "package.json");
+    return JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+  } catch {
+    return {};
+  }
+}
+
+function getAuthorName() {
+  const pkg = getPackageMetadata();
+  if (typeof pkg.author === "string") return pkg.author;
+  if (pkg.author && typeof pkg.author === "object" && pkg.author.name)
+    return pkg.author.name;
+  return "Unknown";
+}
+
+function getAppSettings() {
+  const current = settingsStore.store || {};
+  const merged = {
+    launchAtLogin: Boolean(current.launchAtLogin),
+    showMenubarIcon: Boolean(current.showMenubarIcon),
+    showDockIcon: Boolean(current.showDockIcon),
+    closeToTray: Boolean(current.closeToTray),
+  };
+
+  // Prevent users from hiding both dock + menubar icons on macOS (they'd lose access).
+  if (
+    process.platform === "darwin" &&
+    !merged.showDockIcon &&
+    !merged.showMenubarIcon
+  ) {
+    merged.showDockIcon = true;
+  }
+
+  return merged;
+}
+
+function applyAppSettings() {
+  const settings = getAppSettings();
+
+  // Persist any sanitization.
+  settingsStore.set(settings);
+
+  // Launch at login (macOS / Windows supported by Electron).
+  try {
+    app.setLoginItemSettings({ openAtLogin: settings.launchAtLogin });
+  } catch (err) {
+    console.error("Failed to update launchAtLogin:", err?.message);
+  }
+
+  // Dock icon (macOS only).
+  if (process.platform === "darwin" && app.dock) {
+    if (settings.showDockIcon) app.dock.show();
+    else app.dock.hide();
+  }
+
+  // Menubar (tray) icon.
+  if (settings.showMenubarIcon) {
+    if (!tray && mainWindow) createTray();
+  } else if (tray) {
+    tray.destroy();
+    tray = null;
+  }
+}
 
 // Keytar for secure token storage
 let keytar;
@@ -31,11 +143,15 @@ console.log("Development mode:", isDev);
 
 let mainWindow;
 let tray;
+let isQuitting = false;
 
 function createWindow() {
+  const iconPath = getAppIconPath();
   mainWindow = new BrowserWindow({
     width: 900,
     height: 700,
+    title: APP_NAME,
+    icon: iconPath || undefined,
     show: false,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
@@ -52,11 +168,33 @@ function createWindow() {
   }
 
   mainWindow.on("ready-to-show", () => mainWindow.show());
+
+  mainWindow.on("close", (event) => {
+    if (isQuitting) return;
+
+    const settings = getAppSettings();
+    const canHide =
+      settings.showMenubarIcon ||
+      (process.platform === "darwin" && settings.showDockIcon);
+
+    if (settings.closeToTray && canHide) {
+      event.preventDefault();
+      mainWindow.hide();
+    }
+  });
 }
 
 function createTray() {
-  const iconPath = path.join(__dirname, "..", "public", "icon.png");
-  const nImg = nativeImage.createFromPath(iconPath);
+  const iconPaths = getTrayIconPaths();
+  const iconPath =
+    process.platform === "darwin" && iconPaths.retina
+      ? iconPaths.retina
+      : iconPaths.base || iconPaths.retina;
+  const nImg = iconPath
+    ? nativeImage.createFromPath(iconPath)
+    : nativeImage.createEmpty();
+
+  if (process.platform === "darwin") nImg.setTemplateImage(true);
   tray = new Tray(nImg);
   const contextMenu = Menu.buildFromTemplate([
     { label: "Open GitSignal", click: () => mainWindow.show() },
@@ -79,17 +217,104 @@ function createTray() {
   });
 }
 
+function setDockIcon() {
+  if (process.platform !== "darwin" || !app.dock) return;
+  const iconPath = getAppIconPath();
+  if (!iconPath) return;
+
+  try {
+    const icon = nativeImage.createFromPath(iconPath);
+    if (!icon.isEmpty()) app.dock.setIcon(icon);
+  } catch (err) {
+    console.error("Failed to set dock icon:", err?.message);
+  }
+}
+
+function configureAboutPanel() {
+  const iconPath = getAppIconPath();
+  const author = getAuthorName();
+  const hasAuthor = Boolean(author) && author !== "Unknown";
+
+  try {
+    app.setAboutPanelOptions({
+      applicationName: APP_NAME,
+      website: WEBSITE_URL,
+      iconPath: iconPath || undefined,
+      applicationVersion: app.getVersion(),
+      copyright: hasAuthor
+        ? `© ${new Date().getFullYear()} ${author}`
+        : undefined,
+    });
+  } catch (err) {
+    console.error("Failed to set About panel options:", err?.message);
+  }
+}
+
+function createAppMenu() {
+  const isMac = process.platform === "darwin";
+  const template = [
+    ...(isMac
+      ? [
+          {
+            label: APP_NAME,
+            submenu: [
+              { role: "about" },
+              { type: "separator" },
+              { role: "services" },
+              { type: "separator" },
+              { role: "hide" },
+              { role: "hideOthers" },
+              { role: "unhide" },
+              { type: "separator" },
+              { role: "quit" },
+            ],
+          },
+        ]
+      : []),
+    { role: "fileMenu" },
+    { role: "editMenu" },
+    { role: "viewMenu" },
+    { role: "windowMenu" },
+    {
+      role: "help",
+      submenu: [
+        {
+          label: `${APP_NAME} Website`,
+          click: async () => {
+            await shell.openExternal(WEBSITE_URL);
+          },
+        },
+      ],
+    },
+  ];
+
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
+}
+
 app.whenReady().then(() => {
+  createAppMenu();
+  configureAboutPanel();
+  setDockIcon();
   createWindow();
-  createTray();
+  applyAppSettings();
 
   app.on("activate", function () {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow();
+      applyAppSettings();
+      return;
+    }
+    if (mainWindow) mainWindow.show();
   });
 });
 
 app.on("window-all-closed", function () {
   if (process.platform !== "darwin") app.quit();
+});
+
+app.on("before-quit", () => {
+  isQuitting = true;
 });
 
 // Example: send a system notification when renderer reports new items
@@ -144,4 +369,29 @@ ipcMain.handle("auth:logout", async () => {
     console.error("Logout error:", error);
     return { success: false, error: error.message };
   }
+});
+
+ipcMain.handle("settings:get", async () => {
+  return getAppSettings();
+});
+
+ipcMain.handle("settings:set", async (event, updates) => {
+  const allowedKeys = [
+    "launchAtLogin",
+    "showMenubarIcon",
+    "showDockIcon",
+    "closeToTray",
+  ];
+  const safeUpdates = {};
+
+  for (const key of allowedKeys) {
+    if (Object.prototype.hasOwnProperty.call(updates || {}, key)) {
+      safeUpdates[key] = Boolean(updates[key]);
+    }
+  }
+
+  settingsStore.set(safeUpdates);
+  applyAppSettings();
+
+  return getAppSettings();
 });

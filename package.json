@@ -1,5 +1,6 @@
 {
   "name": "gitsignal",
+  "productName": "GitSignal",
   "author": {
     "name": "Hasit Mistry",
     "email": "hasitnm@gmail.com"
@@ -8,6 +9,13 @@
   "version": "0.1.0",
   "private": true,
   "main": "electron/main.js",
+  "build": {
+    "appId": "dev.gitsignal",
+    "productName": "GitSignal",
+    "mac": {
+      "icon": "electron/assets/icon.icns"
+    }
+  },
   "scripts": {
     "dev": "vite",
     "start": "NODE_ENV=development electron .",

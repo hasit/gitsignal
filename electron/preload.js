@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("electron", {
+  platform: process.platform,
   notify: (payload) => ipcRenderer.send("notify", payload),
   on: (channel, cb) => {
     const valid = ["mark-all-read", "open-preferences"];
@@ -14,5 +15,10 @@ contextBridge.exposeInMainWorld("electron", {
     saveToken: (token) => ipcRenderer.invoke("auth:save-token", token),
     getToken: () => ipcRenderer.invoke("auth:get-token"),
     logout: () => ipcRenderer.invoke("auth:logout"),
+  },
+
+  settings: {
+    get: () => ipcRenderer.invoke("settings:get"),
+    set: (updates) => ipcRenderer.invoke("settings:set", updates),
   },
 });

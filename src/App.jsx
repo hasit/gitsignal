@@ -1,13 +1,71 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { startPolling, markAllRead, setToken, forceRefresh, markAsReadLocally } from './github'
 
+const FILTER_STORAGE_KEY = 'gitsignal:filters'
+
+const DEFAULT_FILTERS = {
+  types: ['PullRequest'],
+  reasons: ['review_requested']
+}
+
+const FILTER_OPTIONS = {
+  types: [
+    'PullRequest',
+    'Issue',
+    'Discussion',
+    'Commit',
+    'Release',
+    'RepositoryVulnerabilityAlert'
+  ],
+  reasons: [
+    'review_requested',
+    'mention',
+    'team_mention',
+    'assign',
+    'author',
+    'comment',
+    'invitation',
+    'manual',
+    'security_advisory_credit',
+    'security_alert',
+    'state_change',
+    'subscribed'
+  ]
+}
+
+function normalizeFilters(filters) {
+  const types = Array.isArray(filters?.types) ? filters.types.filter(Boolean) : []
+  const reasons = Array.isArray(filters?.reasons) ? filters.reasons.filter(Boolean) : []
+  return { types, reasons }
+}
+
+function loadFiltersFromStorage() {
+  try {
+    const raw = localStorage.getItem(FILTER_STORAGE_KEY)
+    if (!raw) return DEFAULT_FILTERS
+    return normalizeFilters(JSON.parse(raw))
+  } catch {
+    return DEFAULT_FILTERS
+  }
+}
+
+function matchesFilters(notification, filters) {
+  const typeMatch = filters.types.length === 0 || filters.types.includes(notification.subject.type)
+  const reasonMatch = filters.reasons.length === 0 || filters.reasons.includes(notification.reason)
+  return typeMatch && reasonMatch
+}
+
 // Settings/Preferences component
-function Settings({ onClose, onLogout, markAsReadOnClick, onMarkAsReadOnClickChange }) {
+function Settings({ onClose, onLogout, markAsReadOnClick, onMarkAsReadOnClickChange, filters, onFiltersChange }) {
   const [tokenInfo, setTokenInfo] = useState(null)
   const [loading, setLoading] = useState(true)
   const [newToken, setNewToken] = useState('')
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState(null)
+  const [appSettings, setAppSettings] = useState(null)
+  const [appSettingsLoading, setAppSettingsLoading] = useState(true)
+  const [appSettingsSaving, setAppSettingsSaving] = useState(false)
+  const [appSettingsError, setAppSettingsError] = useState(null)
 
   useEffect(() => {
     // Fetch current token info from GitHub
@@ -60,6 +118,22 @@ function Settings({ onClose, onLogout, markAsReadOnClick, onMarkAsReadOnClickCha
     fetchTokenInfo()
   }, [])
 
+  useEffect(() => {
+    async function fetchAppSettings() {
+      try {
+        if (!window.electron?.settings) return
+        const settings = await window.electron.settings.get()
+        setAppSettings(settings)
+      } catch (err) {
+        setAppSettingsError(err.message)
+      } finally {
+        setAppSettingsLoading(false)
+      }
+    }
+
+    fetchAppSettings()
+  }, [])
+
   const handleSaveToken = async (e) => {
     e.preventDefault()
     if (!newToken.trim()) return
@@ -86,6 +160,26 @@ function Settings({ onClose, onLogout, markAsReadOnClick, onMarkAsReadOnClickCha
       setSaveError(err.message)
     } finally {
       setSaving(false)
+    }
+  }
+
+  const isMac = window.electron?.platform === 'darwin'
+
+  const saveAppSettings = async (updates) => {
+    if (!window.electron?.settings) return
+
+    setAppSettingsError(null)
+    setAppSettingsSaving(true)
+    try {
+      if (appSettings) {
+        setAppSettings({ ...appSettings, ...updates })
+      }
+      const saved = await window.electron.settings.set(updates)
+      setAppSettings(saved)
+    } catch (err) {
+      setAppSettingsError(err.message)
+    } finally {
+      setAppSettingsSaving(false)
     }
   }
 
@@ -169,6 +263,138 @@ function Settings({ onClose, onLogout, markAsReadOnClick, onMarkAsReadOnClickCha
         <p style={{ fontSize: 12, color: '#666', marginTop: 6, marginLeft: 26 }}>
           When enabled, notifications will be automatically marked as read on GitHub when you click them.
         </p>
+      </div>
+
+      {/* Filters */}
+      <div style={{ marginBottom: 30 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
+          <h3 style={{ marginTop: 0, fontSize: 16 }}>Filters</h3>
+          <button
+            onClick={() => onFiltersChange(DEFAULT_FILTERS)}
+            style={{ padding: '6px 10px', fontSize: 12 }}
+          >
+            Reset to defaults
+          </button>
+        </div>
+        <p style={{ fontSize: 12, color: '#666', marginTop: 6 }}>
+          Defaults show only PR review requests. Filters apply to what GitSignal displays.
+        </p>
+
+        <div style={{ display: 'grid', gap: 14, marginTop: 12 }}>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>Types</div>
+            <div style={{ display: 'grid', gap: 8 }}>
+              {FILTER_OPTIONS.types.map((type) => (
+                <label key={type} style={{ display: 'flex', gap: 10, alignItems: 'center', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={filters.types.includes(type)}
+                    onChange={(e) => {
+                      const nextTypes = e.target.checked
+                        ? [...filters.types, type]
+                        : filters.types.filter(t => t !== type)
+                      onFiltersChange({ ...filters, types: nextTypes })
+                    }}
+                    style={{ width: 16, height: 16, cursor: 'pointer' }}
+                  />
+                  <span style={{ fontSize: 13 }}>{type}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>Reasons</div>
+            <div style={{ display: 'grid', gap: 8 }}>
+              {FILTER_OPTIONS.reasons.map((reason) => (
+                <label key={reason} style={{ display: 'flex', gap: 10, alignItems: 'center', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={filters.reasons.includes(reason)}
+                    onChange={(e) => {
+                      const nextReasons = e.target.checked
+                        ? [...filters.reasons, reason]
+                        : filters.reasons.filter(r => r !== reason)
+                      onFiltersChange({ ...filters, reasons: nextReasons })
+                    }}
+                    style={{ width: 16, height: 16, cursor: 'pointer' }}
+                  />
+                  <span style={{ fontSize: 13 }}>{reason.replace(/_/g, ' ')}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* App */}
+      <div style={{ marginBottom: 30 }}>
+        <h3 style={{ marginTop: 0, fontSize: 16 }}>App</h3>
+        {appSettingsLoading ? (
+          <p style={{ color: '#666', fontSize: 13 }}>Loading app preferences...</p>
+        ) : appSettings ? (
+          <>
+            {appSettingsError && (
+              <div style={{ color: '#b42318', fontSize: 12, marginBottom: 10 }}>
+                {appSettingsError}
+              </div>
+            )}
+
+            <div style={{ display: 'grid', gap: 10 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={Boolean(appSettings.launchAtLogin)}
+                  disabled={appSettingsSaving}
+                  onChange={(e) => saveAppSettings({ launchAtLogin: e.target.checked })}
+                  style={{ width: 16, height: 16, cursor: 'pointer' }}
+                />
+                <span style={{ fontSize: 13 }}>Launch at login</span>
+              </label>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={Boolean(appSettings.showMenubarIcon)}
+                  disabled={appSettingsSaving}
+                  onChange={(e) => saveAppSettings({ showMenubarIcon: e.target.checked })}
+                  style={{ width: 16, height: 16, cursor: 'pointer' }}
+                />
+                <span style={{ fontSize: 13 }}>Show menubar icon</span>
+              </label>
+
+              {isMac && (
+                <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(appSettings.showDockIcon)}
+                    disabled={appSettingsSaving}
+                    onChange={(e) => saveAppSettings({ showDockIcon: e.target.checked })}
+                    style={{ width: 16, height: 16, cursor: 'pointer' }}
+                  />
+                  <span style={{ fontSize: 13 }}>Show dock icon</span>
+                </label>
+              )}
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={Boolean(appSettings.closeToTray)}
+                  disabled={appSettingsSaving}
+                  onChange={(e) => saveAppSettings({ closeToTray: e.target.checked })}
+                  style={{ width: 16, height: 16, cursor: 'pointer' }}
+                />
+                <span style={{ fontSize: 13 }}>Close window to background (hide)</span>
+              </label>
+            </div>
+
+            <p style={{ fontSize: 12, color: '#666', marginTop: 10 }}>
+              Tip: If you hide the dock icon, GitSignal is accessible from the menubar icon.
+            </p>
+          </>
+        ) : (
+          <p style={{ color: '#666', fontSize: 13 }}>App preferences not available.</p>
+        )}
       </div>
 
       {/* Danger Zone */}
@@ -492,15 +718,31 @@ export default function App() {
   const [runtime] = useState(() => (window.electron?.auth ? 'electron' : 'web'))
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isAuthenticating, setIsAuthenticating] = useState(false)
+  const [networkInFlight, setNetworkInFlight] = useState(0)
   const [showSettings, setShowSettings] = useState(false)
   const [markAsReadOnClick, setMarkAsReadOnClick] = useState(
     localStorage.getItem('markAsReadOnClick') === 'true'
   )
-  const [filters, setFilters] = useState({
-    types: [], // e.g., ['PullRequest', 'Issue']
-    reasons: [], // e.g., ['mention', 'review_requested']
-  })
+  const [filters, setFilters] = useState(() => loadFiltersFromStorage())
+  const filtersRef = useRef(filters)
   const [selectedNotifications, setSelectedNotifications] = useState(new Set())
+  const isFetching = networkInFlight > 0
+
+  const trackNetwork = (loading) => {
+    setNetworkInFlight((prev) => Math.max(0, prev + (loading ? 1 : -1)))
+  }
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(filters))
+    } catch {
+      // ignore
+    }
+  }, [filters])
+
+  useEffect(() => {
+    filtersRef.current = filters
+  }, [filters])
 
   // Check for existing token on mount
   useEffect(() => {
@@ -528,19 +770,39 @@ export default function App() {
     checkAuth()
   }, [runtime])
 
+  useEffect(() => {
+    if (runtime !== 'electron') return
+    if (!window.electron?.on) return
+
+    window.electron.on('mark-all-read', async () => {
+      trackNetwork(true)
+      try {
+        await markAllRead()
+        setNotifications([])
+      } finally {
+        trackNetwork(false)
+      }
+    })
+
+    window.electron.on('open-preferences', () => {
+      setShowSettings(true)
+    })
+  }, [runtime])
+
   // Start polling when authenticated
   useEffect(() => {
     if (!isAuthenticated) return
 
     try {
       setStatus('polling')
-      const stop = startPolling((newItems) => {
-        if (!newItems) return
-        setNotifications((prev) => {
-          const ids = new Set(prev.map(p => p.id))
-          const merged = [...newItems.filter(n => !ids.has(n.id)), ...prev]
-
-          newItems.forEach(n => {
+      const stop = startPolling({
+        onLoading: trackNetwork,
+        onUpdate: (data) => {
+          setNotifications(data)
+        },
+        onNew: (newItems) => {
+          const visibleNewItems = newItems.filter(n => matchesFilters(n, filtersRef.current))
+          visibleNewItems.forEach(n => {
             if (window.electron?.notify) {
               window.electron.notify({
                 title: n.subject.title,
@@ -549,18 +811,8 @@ export default function App() {
               })
             }
           })
-          return merged
-        })
+        }
       })
-
-      if (window.electron?.on) {
-        window.electron.on('mark-all-read', () => {
-          markAllRead().then(() => setNotifications([]))
-        })
-        window.electron.on('open-preferences', () => {
-          setShowSettings(true)
-        })
-      }
 
       return () => stop()
     } catch (err) {
@@ -620,15 +872,18 @@ export default function App() {
   // Handle force refresh
   const handleRefresh = async () => {
     setStatus('refreshing')
+    trackNetwork(true)
     try {
       const data = await forceRefresh()
-      if (data && data.length) {
+      if (data !== null) {
         setNotifications(data)
       }
       setStatus('authenticated')
     } catch (err) {
       console.error('Refresh failed:', err)
       setStatus('authenticated')
+    } finally {
+      trackNetwork(false)
     }
   }
 
@@ -650,11 +905,29 @@ export default function App() {
     )
   }
 
+  if (showSettings) {
+    return (
+      <Settings
+        onClose={() => setShowSettings(false)}
+        onLogout={handleLogout}
+        markAsReadOnClick={markAsReadOnClick}
+        onMarkAsReadOnClickChange={handleMarkAsReadOnClickChange}
+        filters={filters}
+        onFiltersChange={setFilters}
+      />
+    )
+  }
+
   // Not authenticated - show token input screen
   if (!isAuthenticated) {
     return (
       <div style={{ padding: 20 }}>
-        <h1>GitSignal</h1>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h1 style={{ margin: 0 }}>GitSignal</h1>
+          <button onClick={() => setShowSettings(true)} style={{ padding: '6px 12px' }} title="Settings">
+            ⚙️
+          </button>
+        </div>
         <p>Welcome to GitSignal! Connect your GitHub account to get started.</p>
 
         <div style={{ padding: 20, background: '#f5f5f5', borderRadius: 8, marginTop: 20 }}>
@@ -684,18 +957,6 @@ export default function App() {
     )
   }
 
-  // Authenticated - show main app or settings
-  if (showSettings) {
-    return (
-      <Settings
-        onClose={() => setShowSettings(false)}
-        onLogout={handleLogout}
-        markAsReadOnClick={markAsReadOnClick}
-        onMarkAsReadOnClickChange={handleMarkAsReadOnClickChange}
-      />
-    )
-  }
-
   return (
     <div style={{ padding: 20 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
@@ -704,10 +965,10 @@ export default function App() {
           <button
             onClick={handleRefresh}
             style={{ padding: '6px 12px' }}
-            disabled={status === 'refreshing'}
+            disabled={isFetching}
             title="Refresh notifications"
           >
-            {status === 'refreshing' ? '⟳' : '🔄'}
+            {isFetching ? '⟳' : '🔄'}
           </button>
           <button onClick={() => setShowSettings(true)} style={{ padding: '6px 12px' }} title="Settings">
             ⚙️
@@ -726,17 +987,17 @@ export default function App() {
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15, fontSize: 13 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ color: '#666' }}>
-            {(() => {
-              // Apply filters
-              const filtered = notifications.filter(n => {
-                const typeMatch = filters.types.length === 0 || filters.types.includes(n.subject.type)
-                const reasonMatch = filters.reasons.length === 0 || filters.reasons.includes(n.reason)
-                return typeMatch && reasonMatch
-              })
-              return `${filtered.length} of ${notifications.length} notifications`
-            })()}
-          </span>
+	          <span style={{ color: '#666' }}>
+	            {(() => {
+	              // Apply filters
+	              const filtered = notifications.filter(n => {
+	                const typeMatch = filters.types.length === 0 || filters.types.includes(n.subject.type)
+	                const reasonMatch = filters.reasons.length === 0 || filters.reasons.includes(n.reason)
+	                return typeMatch && reasonMatch
+	              })
+	              return `${filtered.length} of ${notifications.length} notifications${isFetching ? ' • Updating…' : ''}`
+	            })()}
+	          </span>
           {selectedNotifications.size > 0 && (
             <span style={{
               fontSize: 11,
@@ -755,6 +1016,8 @@ export default function App() {
             <>
               <button
                 onClick={async () => {
+                  trackNetwork(true)
+                  try {
                   const token = await window.electron.auth.getToken()
                   if (!token) return
 
@@ -781,6 +1044,9 @@ export default function App() {
                   // Remove successfully marked notifications from local state
                   setNotifications(prev => prev.filter(n => !markedIds.includes(n.id)))
                   setSelectedNotifications(new Set())
+                  } finally {
+                    trackNetwork(false)
+                  }
                 }}
                 style={{ padding: '4px 10px', fontSize: 12, background: '#0969da', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}
               >
@@ -795,7 +1061,15 @@ export default function App() {
             </>
           ) : (
             <button
-              onClick={() => markAllRead().then(() => setNotifications([]))}
+              onClick={async () => {
+                trackNetwork(true)
+                try {
+                  await markAllRead()
+                  setNotifications([])
+                } finally {
+                  trackNetwork(false)
+                }
+              }}
               style={{ padding: '4px 10px', fontSize: 12 }}
             >
               Mark all read
@@ -813,13 +1087,13 @@ export default function App() {
             return typeMatch && reasonMatch
           })
 
-          if (notifications.length === 0) {
-            return (
-              <p style={{ color: '#666', textAlign: 'center', padding: 40 }}>
-                No notifications. You're all caught up! 🎉
-              </p>
-            )
-          }
+	          if (notifications.length === 0) {
+	            return (
+	              <p style={{ color: '#666', textAlign: 'center', padding: 40 }}>
+	                {isFetching ? 'Loading notifications…' : "No notifications. You're all caught up! 🎉"}
+	              </p>
+	            )
+	          }
 
           if (filtered.length === 0) {
             return (

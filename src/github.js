@@ -5,9 +5,21 @@ let pollInterval = 60 * 1000; // 60s
 let token = null; // TODO: load token from secure storage (Keychain via keytar) or ask renderer to authenticate
 let timer = null;
 let locallyReadIds = new Set(); // Track notifications marked as read locally
+const PER_PAGE = 50;
+
+function getNextUrlFromLinkHeader(linkHeader) {
+  if (!linkHeader) return null;
+  const parts = linkHeader.split(",").map((p) => p.trim());
+  for (const part of parts) {
+    const match = part.match(/<([^>]+)>;\s*rel="next"/);
+    if (match) return match[1];
+  }
+  return null;
+}
 
 export function setToken(t) {
   token = t;
+  etag = null;
 }
 
 // Mark a notification as read locally
@@ -58,36 +70,56 @@ function convertApiUrlToHtmlUrl(notification) {
 export async function fetchNotifications() {
   if (!token) return null;
   try {
-    const headers = {
-      Authorization: `token ${token}`,
+    const baseParams = {
+      all: false, // Only unread notifications
+      participating: false, // Include all notifications, not just participating
+      per_page: PER_PAGE,
     };
-    if (etag) headers["If-None-Match"] = etag;
 
-    // Add query parameters to ensure we only get unread notifications
-    const res = await axios.get("https://api.github.com/notifications", {
-      headers,
-      params: {
-        all: false, // Only unread notifications
-        participating: false, // Include all notifications, not just participating
-      },
-      validateStatus: (status) => status === 200 || status === 304, // Accept both 200 and 304
-    });
-    if (res.status === 200) {
-      etag = res.headers.etag;
-      // Map to simple shape used in UI and filter out locally read notifications
-      return res.data
-        .filter((n) => !locallyReadIds.has(n.id)) // Exclude locally marked as read
-        .map((n) => ({
-          id: n.id,
-          repo: n.repository,
-          subject: n.subject,
-          reason: n.reason,
-          url: n.subject.url, // API URL
-          htmlUrl: convertApiUrlToHtmlUrl(n), // Web URL
-          updated_at: n.updated_at, // Timestamp for expanded view
-        }));
-    }
-    if (res.status === 304) return null; // No new notifications
+    let page = 1;
+    let allNotifications = [];
+    let nextUrl = null;
+
+    do {
+      const headers = {
+        Authorization: `token ${token}`,
+      };
+      if (page === 1 && etag) headers["If-None-Match"] = etag;
+
+      const res = await axios.get(
+        nextUrl || "https://api.github.com/notifications",
+        {
+          headers,
+          params: nextUrl ? undefined : { ...baseParams, page },
+          validateStatus: (status) => status === 200 || (page === 1 && status === 304),
+        }
+      );
+
+      if (page === 1 && res.status === 304) return null; // No new notifications
+
+      if (page === 1) {
+        etag = res.headers.etag;
+      }
+
+      if (Array.isArray(res.data)) {
+        allNotifications.push(...res.data);
+      }
+
+      nextUrl = getNextUrlFromLinkHeader(res.headers.link);
+      page += 1;
+    } while (nextUrl);
+
+    return allNotifications
+      .filter((n) => !locallyReadIds.has(n.id)) // Exclude locally marked as read
+      .map((n) => ({
+        id: n.id,
+        repo: n.repository,
+        subject: n.subject,
+        reason: n.reason,
+        url: n.subject.url, // API URL
+        htmlUrl: convertApiUrlToHtmlUrl(n), // Web URL
+        updated_at: n.updated_at, // Timestamp for expanded view
+      }));
   } catch (err) {
     console.error(
       "fetchNotifications error",
@@ -98,18 +130,29 @@ export async function fetchNotifications() {
   }
 }
 
-export function startPolling(onNew) {
+export function startPolling({ onUpdate, onNew, onLoading } = {}) {
   let last = [];
+  let hasPolledOnce = false;
+
   async function tick() {
-    const data = await fetchNotifications();
-    if (data && data.length) {
-      // naive diff: items not in last
+    onLoading?.(true);
+    try {
+      const data = await fetchNotifications();
+      if (data === null) return;
+
+      onUpdate?.(data);
+
       const lastIds = new Set(last.map((i) => i.id));
       const newItems = data.filter((i) => !lastIds.has(i.id));
-      if (newItems.length) onNew(newItems);
+      if (hasPolledOnce && newItems.length) onNew?.(newItems);
+
       last = data;
+      hasPolledOnce = true;
+    } finally {
+      onLoading?.(false);
     }
   }
+
   tick();
   timer = setInterval(tick, pollInterval);
   return () => clearInterval(timer);
